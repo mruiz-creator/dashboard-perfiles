@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Perfiles de Puesto</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b0f1a; --surface: #111827; --surface2: #1a2235; --border: #1f2d45;
+    --accent: #3b82f6; --accent2: #22d3ee; --accent3: #a78bfa;
+    --green: #10b981; --yellow: #f59e0b; --red: #ef4444;
+    --text: #f1f5f9; --muted: #64748b; --card-radius: 16px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; min-height: 100vh; }
+
+  header { background: linear-gradient(135deg,#0f172a,#1e293b); border-bottom: 1px solid var(--border); padding: 28px 40px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+  .header-left h1 { font-family: 'Plus Jakarta Sans',sans-serif; font-size: 20px; font-weight: 700; letter-spacing: -0.3px; background: linear-gradient(90deg,var(--accent2),var(--accent3)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .header-left p { font-size: 12px; color: var(--muted); margin-top: 3px; letter-spacing: .05em; text-transform: uppercase; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .header-badge { background: linear-gradient(135deg,#1e40af,#7c3aed); padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; color: #c7d2fe; border: 1px solid #3730a3; }
+  .refresh-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--accent2); padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all .2s; font-family: 'Inter',sans-serif; }
+  .refresh-btn:hover { border-color: var(--accent2); background: #0e2a3a; }
+  .last-update { font-size: 11px; color: var(--muted); }
+
+  /* LOADING */
+  .loading-screen { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 999; gap: 16px; }
+  .spinner { width: 48px; height: 48px; border: 3px solid var(--border); border-top-color: var(--accent2); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-family: 'Plus Jakarta Sans',sans-serif; font-size: 16px; color: var(--muted); }
+  .error-screen { position: fixed; inset: 0; background: var(--bg); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 999; gap: 12px; }
+  .error-icon { font-size: 48px; }
+  .error-msg { font-size: 14px; color: var(--muted); text-align: center; max-width: 400px; }
+  .retry-btn { background: var(--accent); color: white; border: none; padding: 10px 24px; border-radius: 8px; font-family: 'Inter',sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+
+  .tabs-bar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 40px; display: flex; gap: 4px; overflow-x: auto; }
+  .tab-btn { padding: 14px 20px; background: none; border: none; color: var(--muted); font-family: 'Inter',sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; transition: all .2s; white-space: nowrap; }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent2); border-bottom-color: var(--accent2); }
+
+  main { padding: 32px 40px; max-width: 1440px; margin: 0 auto; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 28px; }
+  .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--card-radius); padding: 24px; position: relative; overflow: hidden; transition: border-color .2s, transform .2s; }
+  .kpi-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .kpi-card::before { content:''; position: absolute; top:0; left:0; right:0; height:3px; }
+  .kpi-card.blue::before { background: linear-gradient(90deg,var(--accent),var(--accent2)); }
+  .kpi-card.purple::before { background: linear-gradient(90deg,var(--accent3),#ec4899); }
+  .kpi-card.green::before { background: linear-gradient(90deg,var(--green),#34d399); }
+  .kpi-card.yellow::before { background: linear-gradient(90deg,var(--yellow),#fcd34d); }
+  .kpi-card.red::before { background: linear-gradient(90deg,var(--red),#f97316); }
+  .kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; font-weight: 600; margin-bottom: 8px; }
+  .kpi-value { font-family: 'Plus Jakarta Sans',sans-serif; font-size: 38px; font-weight: 700; line-height: 1; }
+  .kpi-sub { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--card-radius); padding: 24px; }
+  .card-title { font-family: 'Plus Jakarta Sans',sans-serif; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; }
+  .card-subtitle { font-size: 11px; color: var(--muted); margin-bottom: 20px; }
+
+  .cob-list { display: flex; flex-direction: column; gap: 14px; }
+  .cob-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .cob-label { font-size: 13px; font-weight: 500; }
+  .cob-nums { font-size: 12px; color: var(--muted); }
+  .cob-pct { font-family: 'Plus Jakarta Sans',sans-serif; font-size: 13px; font-weight: 700; margin-left: 8px; }
+  .cob-bar-bg { background: var(--surface2); border-radius: 6px; height: 10px; overflow: hidden; }
+  .cob-bar { height: 100%; border-radius: 6px; transition: width 1s ease; }
+
+  .table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  thead { background: var(--surface2); }
+  thead th { padding: 12px 16px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); white-space: nowrap; cursor: pointer; }
+  thead th:hover { color: var(--text); }
+  tbody tr { border-top: 1px solid var(--border); transition: background .15s; }
+  tbody tr:hover { background: var(--surface2); }
+  td { padding: 11px 16px; vertical-align: middle; }
+
+  .badge { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .badge-blue   { background:#1e3a5f; color:#60a5fa; }
+  .badge-green  { background:#064e3b; color:#34d399; }
+  .badge-yellow { background:#451a03; color:#fcd34d; }
+  .badge-red    { background:#450a0a; color:#fca5a5; }
+  .badge-purple { background:#2e1065; color:#c084fc; }
+  .badge-pink   { background:#4a044e; color:#f0abfc; }
+  .badge-teal   { background:#042f2e; color:#5eead4; }
+  .badge-orange { background:#431407; color:#fdba74; }
+  .badge-gray   { background:#1f2937; color:#9ca3af; }
+
+  .filter-bar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+  .filter-bar select, .filter-bar input { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 8px 14px; border-radius: 8px; font-family: 'Inter',sans-serif; font-size: 13px; outline: none; cursor: pointer; }
+  .filter-bar select:focus, .filter-bar input:focus { border-color: var(--accent); }
+  .filter-label { font-size: 12px; color: var(--muted); font-weight: 500; }
+
+  .prog-list { display: flex; flex-direction: column; gap: 14px; }
+  .prog-bar-bg { background: var(--surface2); border-radius: 4px; height: 8px; overflow: hidden; }
+  .prog-bar { height: 100%; border-radius: 4px; }
+
+  .timeline { display: flex; flex-direction: column; }
+  .tl-item { display: flex; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--border); align-items: center; }
+  .tl-item:last-child { border-bottom: none; }
+  .tl-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .tl-month { font-size: 11px; color: var(--muted); font-weight: 600; min-width: 70px; }
+  .tl-count { font-family: 'Plus Jakarta Sans',sans-serif; font-size: 18px; font-weight: 700; min-width: 28px; }
+  .tl-bar-wrap { flex: 1; }
+  .tl-bar { height: 6px; border-radius: 3px; }
+
+  .owner-list { display: flex; flex-direction: column; gap: 10px; }
+  .owner-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--surface2); border-radius: 10px; }
+  .owner-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+  .owner-count { margin-left: auto; font-family: 'Plus Jakarta Sans',sans-serif; font-size: 18px; font-weight: 800; color: var(--accent2); }
+
+  .check { color: var(--green); } .cross { color: var(--red); }
+
+  @media(max-width:900px){
+    .kpi-grid{grid-template-columns:repeat(2,1fr);}
+    .grid-2{grid-template-columns:1fr;}
+    main{padding:20px;} header{padding:16px 20px;}
+    .tabs-bar{padding:0 20px;}
+  }
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading-screen" id="loadingScreen">
+  <div class="spinner"></div>
+  <div class="loading-text">Cargando datos en tiempo real...</div>
+</div>
+
+<!-- ERROR -->
+<div class="error-screen" id="errorScreen">
+  <div class="error-icon">⚠️</div>
+  <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:20px;font-weight:700">No se pudieron cargar los datos</div>
+  <div class="error-msg">Verificá que el Apps Script esté publicado correctamente y que el acceso sea público.</div>
+  <button class="retry-btn" onclick="loadData()">Reintentar</button>
+</div>
+
+<header>
+  <div class="header-left">
+    <h1>Perfiles de Puesto — Dashboard</h1>
+    <p id="lastUpdate">Cargando...</p>
+  </div>
+  <div class="header-right">
+    <span class="last-update" id="updateTime"></span>
+    <button class="refresh-btn" onclick="loadData()">↻ Actualizar</button>
+    <div class="header-badge">A3 Mercados · ACyRSA</div>
+  </div>
+</header>
+
+<div class="tabs-bar">
+  <button class="tab-btn active" onclick="showTab('cobertura',this)">📊 Cobertura vs Organigrama</button>
+  <button class="tab-btn" onclick="showTab('resumen',this)">Resumen General</button>
+  <button class="tab-btn" onclick="showTab('responsables',this)">Responsables</button>
+  <button class="tab-btn" onclick="showTab('detalle',this)">Detalle (Form)</button>
+</div>
+
+<main>
+
+<!-- ===== COBERTURA ===== -->
+<div class="panel active" id="panel-cobertura">
+  <div class="kpi-grid">
+    <div class="kpi-card blue">
+      <div class="kpi-label">Total posiciones</div>
+      <div class="kpi-value">120</div>
+      <div class="kpi-sub">Organigrama completo</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">Perfiles cargados</div>
+      <div class="kpi-value" id="kpiCargados" style="color:var(--green)">—</div>
+      <div class="kpi-sub">Mapeados al organigrama</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">Perfiles pendientes</div>
+      <div class="kpi-value" id="kpiPendientes" style="color:var(--red)">—</div>
+      <div class="kpi-sub">Sin perfil cargado</div>
+    </div>
+    <div class="kpi-card yellow">
+      <div class="kpi-label">Cobertura actual</div>
+      <div class="kpi-value" id="kpiCobertura" style="color:var(--yellow)">—</div>
+      <div class="kpi-sub" id="kpiCobSub">de 120 posiciones</div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="margin-bottom:20px">
+    <div class="card">
+      <div class="card-title">Cobertura por área</div>
+      <div class="card-subtitle">Posiciones con perfil cargado vs total del organigrama</div>
+      <div class="cob-list" id="cobBars"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Progreso general</div>
+      <div class="card-subtitle">Cobertura total del proyecto</div>
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 0">
+        <div style="position:relative;width:200px;height:200px">
+          <canvas id="chartGauge"></canvas>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center">
+            <div id="gaugePct" style="font-family:'Plus Jakarta Sans',sans-serif;font-size:38px;font-weight:800;color:var(--yellow)">—</div>
+            <div id="gaugeNum" style="font-size:11px;color:var(--muted)">— / 120</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:32px;margin-top:16px">
+          <div style="text-align:center">
+            <div id="gaugeC" style="font-family:'Plus Jakarta Sans',sans-serif;font-size:28px;font-weight:800;color:var(--green)">—</div>
+            <div style="font-size:11px;color:var(--muted)">Cargados</div>
+          </div>
+          <div style="width:1px;background:var(--border)"></div>
+          <div style="text-align:center">
+            <div id="gaugeP" style="font-family:'Plus Jakarta Sans',sans-serif;font-size:28px;font-weight:800;color:var(--red)">—</div>
+            <div style="font-size:11px;color:var(--muted)">Pendientes</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Posición por posición</div>
+    <div class="card-subtitle">Todas las posiciones del organigrama y su estado</div>
+    <div class="filter-bar" style="margin-top:16px">
+      <span class="filter-label">Filtrar:</span>
+      <select id="cobFilterArea" onchange="renderCobTable()">
+        <option value="">Todas las áreas</option>
+        <option>Control Interno y Riesgos No Financieros</option>
+        <option>Vertical Agro</option>
+        <option>Vertical Financiera</option>
+        <option>Vertical Postrade</option>
+        <option>Vertical Tecnología</option>
+        <option>Gerencia de Legales</option>
+        <option>Administración y Finanzas</option>
+        <option>Capital Humano</option>
+        <option>Gerencia Comercial</option>
+      </select>
+      <select id="cobFilterEstado" onchange="renderCobTable()">
+        <option value="">Todos los estados</option>
+        <option value="CARGADO">Solo cargados</option>
+        <option value="PENDIENTE">Solo pendientes</option>
+      </select>
+      <input type="text" id="cobSearch" placeholder="Buscar puesto..." oninput="renderCobTable()" style="min-width:200px">
+    </div>
+    <div class="table-wrap" style="border:none">
+      <table>
+        <thead><tr>
+          <th>Área</th><th>Posición en organigrama</th><th>Estado</th><th>Perfil cargado en Jotform</th>
+        </tr></thead>
+        <tbody id="tbodyCob"></tbody>
+      </table>
+    </div>
+    <div id="cobCount" style="font-size:12px;color:var(--muted);margin-top:12px;text-align:right"></div>
+  </div>
+</div>
+
+<!-- ===== RESUMEN ===== -->
+<div class="panel" id="panel-resumen">
+  <div class="kpi-grid">
+    <div class="kpi-card blue">
+      <div class="kpi-label">Envíos únicos (creación)</div>
+      <div class="kpi-value" id="kpiCreaciones">—</div>
+      <div class="kpi-sub" id="kpiTotalSub">— envíos totales</div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-label">Modificaciones</div>
+      <div class="kpi-value" id="kpiModificaciones">—</div>
+      <div class="kpi-sub">Iteraciones sobre perfiles</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">Completitud promedio</div>
+      <div class="kpi-value" id="kpiCompletitud">—</div>
+      <div class="kpi-sub" id="kpiCompSub">perfiles al 100%</div>
+    </div>
+    <div class="kpi-card yellow">
+      <div class="kpi-label">Último envío</div>
+      <div class="kpi-value" id="kpiUltimo" style="font-size:24px;padding-top:8px">—</div>
+      <div class="kpi-sub">Fecha más reciente</div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="margin-bottom:20px">
+    <div class="card">
+      <div class="card-title">Evolución mensual</div>
+      <div class="card-subtitle">Nuevos perfiles creados por mes</div>
+      <div style="position:relative;height:220px"><canvas id="chartMonthly"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Por empresa</div>
+      <div class="card-subtitle">Distribución de perfiles nuevos</div>
+      <div style="position:relative;height:220px"><canvas id="chartEmpresa"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Perfiles por área (form)</div>
+      <div class="card-subtitle">Creaciones registradas en Jotform</div>
+      <div class="prog-list" id="progAreas"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Timeline de carga</div>
+      <div class="card-subtitle">Nuevos perfiles por mes</div>
+      <div class="timeline" id="timeline"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== RESPONSABLES ===== -->
+<div class="panel" id="panel-responsables">
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Líderes directos</div>
+      <div class="card-subtitle">Perfiles bajo su responsabilidad</div>
+      <div class="owner-list" id="ownerList"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Ranking de líderes</div>
+      <div class="card-subtitle">Perfiles enviados por líder</div>
+      <div style="position:relative;height:320px"><canvas id="chartOwners"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== DETALLE ===== -->
+<div class="panel" id="panel-detalle">
+  <div class="filter-bar">
+    <span class="filter-label">Filtrar:</span>
+    <select id="filterEmpresa" onchange="renderTable()">
+      <option value="">Todas las empresas</option>
+      <option>A3 Mercados</option>
+      <option>Argentina Clearing y Registro</option>
+    </select>
+    <select id="filterArea" onchange="renderTable()">
+      <option value="">Todas las áreas</option>
+    </select>
+    <select id="filterTipo" onchange="renderTable()">
+      <option value="">Creaciones y modificaciones</option>
+      <option value="Creación">Solo creaciones</option>
+      <option value="Modificación">Solo modificaciones</option>
+    </select>
+    <input type="text" id="filterSearch" placeholder="Buscar puesto..." oninput="renderTable()" style="min-width:200px">
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th onclick="sortTable('fecha')">Fecha ↕</th>
+        <th onclick="sortTable('puesto')">Puesto ↕</th>
+        <th onclick="sortTable('tipo')">Tipo ↕</th>
+        <th onclick="sortTable('empresa')">Empresa ↕</th>
+        <th onclick="sortTable('area')">Área ↕</th>
+        <th>Líder</th>
+        <th>Misión</th>
+        <th>Respon.</th>
+        <th>Completitud</th>
+      </tr></thead>
+      <tbody id="tbodyDetalle"></tbody>
+    </table>
+  </div>
+  <div id="tableCount" style="font-size:12px;color:var(--muted);margin-top:12px;text-align:right"></div>
+</div>
+
+</main>
+
+<script>
+// ===== CONFIG =====
+const API_URL = "https://script.google.com/macros/s/AKfycbzvQOuRECAWUOEDdZMkU1TnkESJHEgMi9nZZKBlaGtNpIq4-FtWxGeTUFJtKc7wKGqm/exec";
+const TOTAL_ORG = 120;
+
+// ===== ORGANIGRAMA (para cobertura) =====
+const cobData = [{"area":"Control Interno y Riesgos No Financieros","puesto_org":"Analista de Control Interno","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Agro","puesto_org":"Responsable de Relaciones Institucionales","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Agro","puesto_org":"Responsable de Operaciones Agropecuario","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Agro","puesto_org":"Analista de Operaciones Agro","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Financiera","puesto_org":"Líder de Producto","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Financiera","puesto_org":"Líder de Mercado Primario","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Financiera","puesto_org":"Líder de Generación de Negocios","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Financiera","puesto_org":"Analista de Producto","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Financiera","puesto_org":"Analista Generación de Negocios","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Financiera","puesto_org":"Analista Mercado Primario","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Financiera","puesto_org":"Referente Control de Mercados","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Financiera","puesto_org":"Analista Control de Mercados","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Financiera","puesto_org":"Analista de Operaciones Financiera","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Financiera","puesto_org":"Referente de I&D","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Financiera","puesto_org":"Analista de I&D","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Financiera","puesto_org":"Referente A3 Academia","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Financiera","puesto_org":"Analista de Comunicación y Procesos","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Financiera","puesto_org":"Automation Developer","perfil_cargado":"Automation Developer - MERCADERIAS","estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Gerente General Argentina Clearing","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Gerente de Auditoría y Procesos","perfil_cargado":"Gerente - AUDITORIA Y PROCESOS","estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Gerente de Riesgos","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Gerente de Mercaderías","perfil_cargado":"Gerente - MERCADERIAS","estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Gerente de Operaciones","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Gerente Custodia de Activos","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Python Developer & Clearing Analyst","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Coordinador de Proyectos","perfil_cargado":"Coordinador de Proyectos","estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Analista Funcional e Integración de Proyectos","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Referente de Mercaderías","perfil_cargado":"Referente - MERCADERIAS","estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Analista de Mercaderías","perfil_cargado":"Analista Ssr - MERCADERIAS","estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Responsable de Carteras","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Responsable Liquidaciones FyO MFCI","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Líder Liquidaciones SPOT","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Analista de Carteras","perfil_cargado":"Analista - CARTERAS","estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Analista Funcional de Mercado","perfil_cargado":"Analista Funcional Operativo (Mercado) - CARTERAS","estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Analista de Liquidaciones","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Especialista de Liquidaciones","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Responsable de Custodia de Activos","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Controller de Custodia de Activos","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Analista de Custodia de Activos","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Responsable de Riesgos","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Analista de Riesgo de Mercado","perfil_cargado":"Analista de Riesgo Mercado - RIESGOS","estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Analista de Riesgo de Crédito","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Analista de Riesgo Operacional","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Especialista de Procesos y Mejora","perfil_cargado":"Especialista - PROCESOS Y MEJORA","estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Referente de Auditoría Interna","perfil_cargado":"Referente - AUDITORIA INTERNA","estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Analista de Auditoría y Procesos","perfil_cargado":"Analista - AUDITORIA Y PROCESOS","estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Responsable Fiscalización Externa","perfil_cargado":"Responsable - FISCALIZACIÓN EXTERNA","estado":"PENDIENTE"},{"area":"Vertical Postrade","puesto_org":"Analista Fiscalización Externa","perfil_cargado":"Analista - FISCALIZACIÓN EXTERNA","estado":"PENDIENTE"},{"area":"Vertical Tecnología","puesto_org":"CEO Primary","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Tecnología","puesto_org":"CEO Lumina Americas","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Tecnología","puesto_org":"Gerente de Desarrollo de Software","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Tecnología","puesto_org":"Gerente de Integración Tecnología y Mercado","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Tecnología","puesto_org":"PMO","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Tecnología","puesto_org":"Analista APIS","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Tecnología","puesto_org":"Scrum Master","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Tecnología","puesto_org":"Referente Técnico Siopel Host","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Tecnología","puesto_org":"Referente Técnico Siopel PC API","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Tecnología","puesto_org":"Referente Técnico Service Desk","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Tecnología","puesto_org":"Referente Técnico Market Data","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Tecnología","puesto_org":"Referente Técnico QA","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Tecnología","puesto_org":"Patron","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Tecnología","puesto_org":"Desarrollador","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Tecnología","puesto_org":"Analista Monitoreo","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Tecnología","puesto_org":"Analista QA","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Vertical Tecnología","puesto_org":"Soporte","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Gerencia de Legales","puesto_org":"Gerente de Legales Corporativa","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Gerencia de Legales","puesto_org":"Líder ABM Agentes","perfil_cargado":"Líder - ABM AGENTES","estado":"PENDIENTE"},{"area":"Gerencia de Legales","puesto_org":"Responsable de Legales","perfil_cargado":"Responsable - LEGALES","estado":"PENDIENTE"},{"area":"Gerencia de Legales","puesto_org":"Responsable de Legales Regulatorio","perfil_cargado":"Responsable - LEGALES REGULATORIO","estado":"PENDIENTE"},{"area":"Gerencia de Legales","puesto_org":"Oficial de Compliance","perfil_cargado":"Compliance Officer - LEGALES","estado":"PENDIENTE"},{"area":"Gerencia de Legales","puesto_org":"Responsable de Legales Corporativa","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Gerencia de Legales","puesto_org":"Especialista Legal en Nuevos Negocios","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Gerencia de Legales","puesto_org":"Analista de Legales Corporativa","perfil_cargado":"Abogado - LEGALES","estado":"PENDIENTE"},{"area":"Gerencia de Legales","puesto_org":"Analista Legales Regulatorio","perfil_cargado":"Analista - LEGALES REGULATORIO","estado":"PENDIENTE"},{"area":"Gerencia de Legales","puesto_org":"ABM Agentes","perfil_cargado":"Administrativo - ABM AGENTES","estado":"PENDIENTE"},{"area":"Gerencia de Legales","puesto_org":"Mesa de Entradas","perfil_cargado":"Administrativo - ABM AGENTES","estado":"PENDIENTE"},{"area":"Administración y Finanzas","puesto_org":"Gerente de Administración","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Administración y Finanzas","puesto_org":"Responsable de Finanzas","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Administración y Finanzas","puesto_org":"Responsable Presupuesto y Control de Gestión","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Administración y Finanzas","puesto_org":"Responsable Sostenibilidad A3 Mercados","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Administración y Finanzas","puesto_org":"Responsable de Comunicación","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Administración y Finanzas","puesto_org":"Analista Financiero","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Administración y Finanzas","puesto_org":"Analista de Presupuesto","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Administración y Finanzas","puesto_org":"Referente de Relaciones con el Inversor","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Administración y Finanzas","puesto_org":"Analista de Inversiones","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Administración y Finanzas","puesto_org":"Analista de Prensa","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Administración y Finanzas","puesto_org":"Responsable de Contabilidad y Laboral","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Administración y Finanzas","puesto_org":"Responsable de Impuestos","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Administración y Finanzas","puesto_org":"Responsable de Administración","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Administración y Finanzas","puesto_org":"Desarrollador Full Stack","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Administración y Finanzas","puesto_org":"Referente de Compras","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Administración y Finanzas","puesto_org":"Analista Contable","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Administración y Finanzas","puesto_org":"Analista de Impuestos","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Administración y Finanzas","puesto_org":"Analista Administrativo","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Administración y Finanzas","puesto_org":"Recepcionista","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Administración y Finanzas","puesto_org":"Cadete","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Administración y Finanzas","puesto_org":"Personal de Mantenimiento","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Capital Humano","puesto_org":"Gerente de Capital Humano Tecnología","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Capital Humano","puesto_org":"HRBP","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Capital Humano","puesto_org":"Analista de Entrenamiento y Desarrollo","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Capital Humano","puesto_org":"BackOffice Capital Humano","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Capital Humano","puesto_org":"Comunicación Interna","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Capital Humano","puesto_org":"Recruiter","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Gerencia Comercial","puesto_org":"Responsable Comercial","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Gerencia Comercial","puesto_org":"CX Champion","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Gerencia Comercial","puesto_org":"CX Líder","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Gerencia Comercial","puesto_org":"Responsable Atención al Cliente","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Gerencia Comercial","puesto_org":"Responsable de Soporte Comercial","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Gerencia Comercial","puesto_org":"Responsable de Desarrollo Comercial PMY","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Gerencia Comercial","puesto_org":"Referente Comercial de Agro","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Gerencia Comercial","puesto_org":"Analista Comercial","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Gerencia Comercial","puesto_org":"Analista Comercial Dólar","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Gerencia Comercial","puesto_org":"CX Service Design","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Gerencia Comercial","puesto_org":"Service Design","perfil_cargado":"Service Design Strategist","estado":"PENDIENTE"},{"area":"Gerencia Comercial","puesto_org":"Customer Insight","perfil_cargado":"Analista Ssr de Customer Insights - CX","estado":"PENDIENTE"},{"area":"Gerencia Comercial","puesto_org":"Comunicación Tecnología","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Gerencia Comercial","puesto_org":"Analista de Atención al Cliente","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Gerencia Comercial","puesto_org":"Analista de Soporte Comercial","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Gerencia Comercial","puesto_org":"Analista de Desarrollo Comercial","perfil_cargado":null,"estado":"PENDIENTE"},{"area":"Gerencia Comercial","puesto_org":"CX Analista","perfil_cargado":null,"estado":"PENDIENTE"}];
+
+// Mapeo nombre jotform -> nombre org
+const matchMap = {
+  "Automation Developer - MERCADERIAS": "Automation Developer",
+  "Gerente - AUDITORIA Y PROCESOS": "Gerente de Auditoría y Procesos",
+  "Gerente - Auditoría y Procesos": "Gerente de Auditoría y Procesos",
+  "Gerente - MERCADERIAS": "Gerente de Mercaderías",
+  "Coordinador de Proyectos": "Coordinador de Proyectos",
+  "Referente - MERCADERIAS": "Referente de Mercaderías",
+  "Analista Ssr - MERCADERIAS": "Analista de Mercaderías",
+  "Analista - CARTERAS": "Analista de Carteras",
+  "Analista Funcional Operativo (Mercado) - CARTERAS": "Analista Funcional de Mercado",
+  "Analista de Riesgo Mercado - RIESGOS": "Analista de Riesgo de Mercado",
+  "Analista Jr - RIESGOS ACYRSA": "Analista de Riesgo de Mercado",
+  "Especialista - PROCESOS Y MEJORA": "Especialista de Procesos y Mejora",
+  "Especialista - Procesos y Mejora": "Especialista de Procesos y Mejora",
+  "Referente - AUDITORIA INTERNA": "Referente de Auditoría Interna",
+  "Analista - AUDITORIA Y PROCESOS": "Analista de Auditoría y Procesos",
+  "Analista - Auditoría y Procesos": "Analista de Auditoría y Procesos",
+  "Responsable - FISCALIZACIÓN EXTERNA": "Responsable Fiscalización Externa",
+  "Responsable - Fiscalización Externa": "Responsable Fiscalización Externa",
+  "Analista - FISCALIZACIÓN EXTERNA": "Analista Fiscalización Externa",
+  "Líder - ABM AGENTES": "Líder ABM Agentes",
+  "Responsable - LEGALES": "Responsable de Legales",
+  "Responsable - LEGALES REGULATORIO": "Responsable de Legales Regulatorio",
+  "Compliance Officer - LEGALES": "Oficial de Compliance",
+  "Abogado - LEGALES": "Analista de Legales Corporativa",
+  "Analista - LEGALES REGULATORIO": "Analista Legales Regulatorio",
+  "Administrativo - ABM AGENTES": "ABM Agentes",
+  "Analista - ABM AGENTES": "ABM Agentes",
+  "Service Design Strategist": "Service Design",
+  "Analista Ssr de Customer Insights - CX": "Customer Insight",
+  "Customer Insights & Technology Specialist": "Customer Insight",
+};
+
+const areaBadge = {
+  "Control Interno y Riesgos No Financieros":"badge-gray","Vertical Agro":"badge-green",
+  "Vertical Financiera":"badge-yellow","Vertical Postrade":"badge-purple",
+  "Vertical Tecnología":"badge-teal","Gerencia de Legales":"badge-pink",
+  "Administración y Finanzas":"badge-blue","Capital Humano":"badge-orange","Gerencia Comercial":"badge-green"
+};
+
+// ===== CHARTS =====
+let chartGauge=null, chartMonthly=null, chartEmpresa=null, chartOwners=null;
+const chartColors = {
+  grid:'#1f2d45', ticks:'#64748b', legend:'#94a3b8'
+};
+
+function destroyChart(c){ if(c){ c.destroy(); } }
+
+// ===== MAIN LOAD =====
+let allData = [];
+let sKey='fecha', sDir=-1;
+
+async function loadData(){
+  document.getElementById('loadingScreen').style.display='flex';
+  document.getElementById('errorScreen').style.display='none';
+  try {
+    const res = await fetch(API_URL);
+    const json = await res.json();
+    if(!json.ok) throw new Error('API error');
+    allData = json.registros;
+    buildDashboard(allData);
+    document.getElementById('loadingScreen').style.display='none';
+    const now = new Date();
+    document.getElementById('lastUpdate').textContent = `Actualizado · ${now.toLocaleDateString('es-AR')} ${now.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}`;
+  } catch(e){
+    document.getElementById('loadingScreen').style.display='none';
+    document.getElementById('errorScreen').style.display='flex';
+  }
+}
+
+function buildDashboard(data){
+  const creaciones = data.filter(r => r.tipo.includes('Crear'));
+  const modificaciones = data.filter(r => !r.tipo.includes('Crear'));
+
+  // ===== COBERTURA =====
+  // Marcar qué puestos del org tienen perfil cargado según datos reales
+  const puestosEnForm = new Set(creaciones.map(r => r.puesto));
+  const cobDataDynamic = cobData.map(row => {
+    const orgName = row.puesto_org;
+    // Buscar si algún perfil del form matchea con este puesto
+    let cargado = false;
+    let perfilNombre = null;
+    for(const [formName, orgNameMatch] of Object.entries(matchMap)){
+      if(orgNameMatch === orgName && puestosEnForm.has(formName)){
+        cargado = true;
+        perfilNombre = formName;
+        break;
+      }
+    }
+    return {...row, estado: cargado ? 'CARGADO' : 'PENDIENTE', perfil_cargado: perfilNombre || row.perfil_cargado};
+  });
+
+  const totalCargados = cobDataDynamic.filter(r=>r.estado==='CARGADO').length;
+  const totalPendientes = TOTAL_ORG - totalCargados;
+  const pctCob = Math.round(totalCargados/TOTAL_ORG*100);
+
+  document.getElementById('kpiCargados').textContent = totalCargados;
+  document.getElementById('kpiPendientes').textContent = totalPendientes;
+  document.getElementById('kpiCobertura').textContent = pctCob + '%';
+  document.getElementById('kpiCobSub').textContent = `${totalCargados} de ${TOTAL_ORG} posiciones`;
+  document.getElementById('gaugePct').textContent = pctCob + '%';
+  document.getElementById('gaugeNum').textContent = `${totalCargados} / ${TOTAL_ORG}`;
+  document.getElementById('gaugeC').textContent = totalCargados;
+  document.getElementById('gaugeP').textContent = totalPendientes;
+
+  // Gauge chart
+  destroyChart(chartGauge);
+  chartGauge = new Chart(document.getElementById('chartGauge'),{
+    type:'doughnut',
+    data:{datasets:[{data:[totalCargados, totalPendientes],backgroundColor:['#f59e0b','#1f2d45'],borderColor:'#0b0f1a',borderWidth:4}]},
+    options:{cutout:'72%',plugins:{legend:{display:false},tooltip:{enabled:false}},animation:{duration:1000}}
+  });
+
+  // Barras cobertura por área
+  const areaStats = {};
+  cobDataDynamic.forEach(r=>{
+    if(!areaStats[r.area]) areaStats[r.area]={total:0,cargados:0};
+    areaStats[r.area].total++;
+    if(r.estado==='CARGADO') areaStats[r.area].cargados++;
+  });
+  const cobBarsEl = document.getElementById('cobBars');
+  cobBarsEl.innerHTML='';
+  Object.entries(areaStats).forEach(([area,s])=>{
+    const pct = Math.round(s.cargados/s.total*100);
+    const col = pct>=60?'var(--green)':pct>=20?'var(--yellow)':pct>0?'var(--accent)':'#374151';
+    cobBarsEl.innerHTML+=`<div>
+      <div class="cob-header"><span class="cob-label">${area}</span>
+      <span style="display:flex;align-items:center;gap:6px">
+        <span class="cob-nums">${s.cargados}/${s.total}</span>
+        <span class="cob-pct" style="color:${col}">${pct}%</span>
+      </span></div>
+      <div class="cob-bar-bg"><div class="cob-bar" style="width:${pct}%;background:${col}"></div></div>
+    </div>`;
+  });
+
+  // Store para tabla cobertura
+  window._cobDataDynamic = cobDataDynamic;
+  renderCobTable();
+
+  // ===== RESUMEN =====
+  const compAl100 = creaciones.filter(r=>r.completitud===100).length;
+  const avgComp = creaciones.length ? Math.round(creaciones.reduce((s,r)=>s+r.completitud,0)/creaciones.length) : 0;
+  const fechas = creaciones.map(r=>r.fecha).filter(Boolean).sort();
+  const ultimaFecha = fechas.length ? fechas[fechas.length-1] : '—';
+
+  document.getElementById('kpiCreaciones').textContent = creaciones.length;
+  document.getElementById('kpiTotalSub').textContent = `${data.length} envíos totales`;
+  document.getElementById('kpiModificaciones').textContent = modificaciones.length;
+  document.getElementById('kpiCompletitud').textContent = avgComp + '%';
+  document.getElementById('kpiCompSub').textContent = `${compAl100} de ${creaciones.length} al 100%`;
+  document.getElementById('kpiUltimo').textContent = ultimaFecha.slice(0,7); // yyyy-mm
+
+  // Evolución mensual
+  const byMonth = {};
+  creaciones.forEach(r=>{
+    if(!r.fecha) return;
+    const m = r.fecha.slice(0,7);
+    byMonth[m] = (byMonth[m]||0)+1;
+  });
+  const months = Object.keys(byMonth).sort();
+  const monthLabels = months.map(m=>{
+    const [y,mo] = m.split('-');
+    const names=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    return `${names[parseInt(mo)-1]} ${y}`;
+  });
+  const barColors = ['#1e40af','#5b21b6','#0891b2','#065f46','#7c3aed','#be185d'];
+
+  destroyChart(chartMonthly);
+  chartMonthly = new Chart(document.getElementById('chartMonthly'),{
+    type:'bar',
+    data:{labels:monthLabels, datasets:[{data:months.map(m=>byMonth[m]), backgroundColor:months.map((_,i)=>barColors[i%barColors.length]), borderRadius:8, borderSkipped:false}]},
+    options:{plugins:{legend:{display:false}}, scales:{x:{ticks:{color:chartColors.ticks,font:{family:'Inter',size:11}},grid:{color:chartColors.grid}}, y:{ticks:{color:chartColors.ticks,font:{family:'Inter',size:11}},grid:{color:chartColors.grid}}}}
+  });
+
+  // Por empresa
+  const byEmp = {};
+  creaciones.forEach(r=>{ byEmp[r.empresa]=(byEmp[r.empresa]||0)+1; });
+  destroyChart(chartEmpresa);
+  chartEmpresa = new Chart(document.getElementById('chartEmpresa'),{
+    type:'doughnut',
+    data:{labels:Object.keys(byEmp), datasets:[{data:Object.values(byEmp),backgroundColor:['#1d4ed8','#0e7490'],borderColor:'#111827',borderWidth:3,hoverOffset:8}]},
+    options:{cutout:'68%',plugins:{legend:{position:'bottom',labels:{color:chartColors.legend,font:{family:'Inter',size:11},padding:16}}}}
+  });
+
+  // Por área (form)
+  const byArea = {};
+  creaciones.forEach(r=>{ if(r.area) byArea[r.area]=(byArea[r.area]||0)+1; });
+  const sortedAreas = Object.entries(byArea).sort((a,b)=>b[1]-a[1]);
+  const maxArea = sortedAreas[0]?.[1]||1;
+  const progEl = document.getElementById('progAreas');
+  progEl.innerHTML='';
+  const areaBarColors=['var(--accent)','var(--accent3)','var(--accent2)','var(--green)','var(--yellow)','var(--red)'];
+  sortedAreas.forEach(([area,n],i)=>{
+    progEl.innerHTML+=`<div><div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-size:12px;font-weight:500">${area}</span><span style="font-size:12px;color:var(--muted)">${n}</span></div><div class="prog-bar-bg"><div class="prog-bar" style="width:${Math.round(n/maxArea*100)}%;background:${areaBarColors[i%areaBarColors.length]}"></div></div></div>`;
+  });
+
+  // Timeline
+  const tlEl = document.getElementById('timeline');
+  tlEl.innerHTML='';
+  const tlColors=['var(--accent)','var(--accent3)','var(--accent2)','var(--green)','var(--yellow)','var(--red)'];
+  months.forEach((m,i)=>{
+    const label = monthLabels[i];
+    const n = byMonth[m];
+    const col = tlColors[i%tlColors.length];
+    const pct = Math.round(n/Math.max(...Object.values(byMonth))*100);
+    tlEl.innerHTML+=`<div class="tl-item"><div class="tl-dot" style="background:${col}"></div><div class="tl-month">${label}</div><div class="tl-count" style="color:${col}">${n}</div><div class="tl-bar-wrap"><div class="tl-bar" style="width:${pct}%;background:${col}"></div></div></div>`;
+  });
+
+  // ===== RESPONSABLES =====
+  const byLider = {};
+  creaciones.forEach(r=>{ if(r.lider){ byLider[r.lider]=(byLider[r.lider]||0)+1; } });
+  const sortedLideres = Object.entries(byLider).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const avColors=['#1d4ed8','#7c3aed','#0e7490','#059669','#b45309','#be123c','#374151','#0369a1','#166534','#6b21a8'];
+  const owEl = document.getElementById('ownerList');
+  owEl.innerHTML='';
+  sortedLideres.forEach(([email,n],i)=>{
+    const ini=email.split('@')[0].slice(0,2).toUpperCase();
+    const nombre=email.split('@')[0];
+    owEl.innerHTML+=`<div class="owner-item"><div class="owner-avatar" style="background:${avColors[i]}20;color:${avColors[i]};border:1px solid ${avColors[i]}40">${ini}</div><div><div style="font-size:13px;font-weight:500">${nombre}</div><div style="font-size:12px;color:var(--muted)">${email}</div></div><div class="owner-count">${n}</div></div>`;
+  });
+
+  destroyChart(chartOwners);
+  chartOwners = new Chart(document.getElementById('chartOwners'),{
+    type:'bar',
+    data:{labels:sortedLideres.map(([e])=>e.split('@')[0]), datasets:[{data:sortedLideres.map(([,n])=>n),backgroundColor:'#7c3aed',borderRadius:6,borderSkipped:false}]},
+    options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{color:chartColors.ticks,font:{family:'Inter',size:11}},grid:{color:chartColors.grid}},y:{ticks:{color:chartColors.ticks,font:{family:'Inter',size:11}},grid:{color:chartColors.grid}}}}
+  });
+
+  // Populatefilter area detalle
+  const areas = [...new Set(data.map(r=>r.area).filter(Boolean))].sort();
+  const sel = document.getElementById('filterArea');
+  sel.innerHTML='<option value="">Todas las áreas</option>';
+  areas.forEach(a=>{ sel.innerHTML+=`<option>${a}</option>`; });
+
+  renderTable();
+}
+
+// ===== COB TABLE =====
+function renderCobTable(){
+  const src = window._cobDataDynamic || cobData;
+  const fA=document.getElementById('cobFilterArea').value;
+  const fE=document.getElementById('cobFilterEstado').value;
+  const fs=document.getElementById('cobSearch').value.toLowerCase();
+  const filtered=src.filter(r=>(!fA||r.area===fA)&&(!fE||r.estado===fE)&&(!fs||r.puesto_org.toLowerCase().includes(fs)));
+  const tb=document.getElementById('tbodyCob');
+  tb.innerHTML='';
+  filtered.forEach(r=>{
+    const eb=r.estado==='CARGADO'?'<span class="badge badge-green">✓ Cargado</span>':'<span class="badge badge-red">⏳ Pendiente</span>';
+    const pc=r.perfil_cargado?`<span style="font-size:12px;color:var(--muted)">${r.perfil_cargado}</span>`:'<span style="color:var(--border)">—</span>';
+    tb.innerHTML+=`<tr><td><span class="badge ${areaBadge[r.area]||'badge-blue'}" style="font-size:10px">${r.area}</span></td><td style="font-weight:500">${r.puesto_org}</td><td>${eb}</td><td>${pc}</td></tr>`;
+  });
+  document.getElementById('cobCount').textContent=`Mostrando ${filtered.length} de ${src.length} posiciones`;
+}
+
+// ===== DETALLE TABLE =====
+function renderTable(){
+  const fE=document.getElementById('filterEmpresa').value;
+  const fA=document.getElementById('filterArea').value;
+  const fT=document.getElementById('filterTipo').value;
+  const fs=document.getElementById('filterSearch').value.toLowerCase();
+  let data=allData.filter(r=>
+    (!fE||r.empresa===fE)&&
+    (!fA||r.area===fA)&&
+    (!fT||(fT==='Creación'?r.tipo.includes('Crear'):!r.tipo.includes('Crear')))&&
+    (!fs||r.puesto.toLowerCase().includes(fs))
+  );
+  data.sort((a,b)=>(a[sKey]||'').localeCompare(b[sKey]||'')*sDir);
+  const empC={'A3 Mercados':'badge-blue','Argentina Clearing y Registro':'badge-teal'};
+  const tb=document.getElementById('tbodyDetalle');
+  tb.innerHTML='';
+  data.forEach(r=>{
+    const cb=r.completitud===100?'badge-green':'badge-yellow';
+    const es=r.empresa==='A3 Mercados'?'A3':'ACyRSA';
+    const tipoBadge=r.tipo.includes('Crear')?'badge-blue':'badge-purple';
+    tb.innerHTML+=`<tr>
+      <td style="color:var(--muted);white-space:nowrap">${r.fecha||'—'}</td>
+      <td style="font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.puesto}">${r.puesto}</td>
+      <td><span class="badge ${tipoBadge}" style="font-size:10px">${r.tipo.includes('Crear')?'Creación':'Modificación'}</span></td>
+      <td><span class="badge ${empC[r.empresa]||'badge-blue'}">${es}</span></td>
+      <td style="font-size:11px;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.area||'—'}</td>
+      <td style="font-size:11px;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.lider?r.lider.split('@')[0]:'<span style="color:var(--red)">Sin asignar</span>'}</td>
+      <td style="text-align:center">${r.mision?'<span class="check">✓</span>':'<span class="cross">✗</span>'}</td>
+      <td style="text-align:center">${r.responsabilidad?'<span class="check">✓</span>':'<span class="cross">✗</span>'}</td>
+      <td><span class="badge ${cb}">${r.completitud}%</span></td>
+    </tr>`;
+  });
+  document.getElementById('tableCount').textContent=`Mostrando ${data.length} de ${allData.length} registros`;
+}
+function sortTable(k){if(sKey===k)sDir*=-1;else{sKey=k;sDir=1;}renderTable();}
+
+// ===== TABS =====
+function showTab(tab,btn){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('panel-'+tab).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ===== INIT =====
+loadData();
+</script>
+</body>
+</html>
